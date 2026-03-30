@@ -1,0 +1,67 @@
+<%
+  issue = local_assigns[:issue] || @issue
+  return unless issue && issue.attributes_editable?
+
+  assignable_user_ids = issue.assignable_users.map(&:id)
+  author    = issue.author if issue.author && assignable_user_ids.include?(issue.author_id)
+  last_user = issue.journals.reorder(id: :desc).detect { |j| j.user.present? }&.user
+  last_user = nil unless last_user && assignable_user_ids.include?(last_user.id)
+  prev_detail = JournalDetail.joins(:journal)
+    .where(journals: { journalized_type: 'Issue', journalized_id: issue.id },
+           property: 'attr', prop_key: 'assigned_to_id')
+    .reorder('journals.id DESC').first
+  prev_user = User.find_by(id: prev_detail&.old_value.presence)
+  prev_user = nil unless prev_user && assignable_user_ids.include?(prev_user.id)
+  current_assignee_id = issue.assigned_to_id
+  return unless author || last_user || prev_user
+%>
+
+<% content_for :header_tags do %>
+<style id="rqa-styles">
+.quick-assign-actions{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:8px 0 4px;padding:6px 0;border-top:1px solid #e0e0e0}
+.rqa-label{font-size:.8rem;font-weight:600;color:#555;white-space:nowrap;margin-right:4px}
+.rqa-btn,.rqa-btn:visited{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;font-size:.78rem;font-family:inherit;color:#333 !important;background:#f4f4f4;border:1px solid #ccc;border-radius:3px;cursor:pointer;white-space:nowrap;line-height:1.4;text-decoration:none}
+.rqa-btn:hover{background:#e8e8e8;border-color:#aaa;box-shadow:0 1px 3px rgba(0,0,0,.12);color:#333 !important;text-decoration:none}
+.rqa-btn[disabled]{opacity:.55;cursor:not-allowed;background:#f6f6f6;box-shadow:none}
+.rqa-icon{width:13px;height:13px;fill:currentColor;flex-shrink:0}
+.rqa-name{color:#777;font-weight:400}
+@media(max-width:540px){.quick-assign-actions{flex-direction:column;align-items:flex-start}.rqa-btn{width:100%;justify-content:center}}
+</style>
+<% end %>
+
+<div class="quick-assign-actions">
+  <span class="rqa-label"><%= l(:label_quick_assign) %>:</span>
+
+  <% if author %>
+    <% author_same = author.id == current_assignee_id %>
+    <%= form_tag issue_path(issue), method: :put, style: 'display:inline' do %>
+      <%= hidden_field_tag 'issue[assigned_to_id]', author.id, id: nil %>
+      <button type="submit" class="rqa-btn" <%= 'disabled' if author_same %>>
+        <svg class="rqa-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm5 5a5 5 0 0 0-10 0h10Z"/></svg>
+        <%= l(:button_quick_assign_author) %> (<%= h(author.name) %>)
+      </button>
+    <% end %>
+  <% end %>
+
+  <% if last_user %>
+    <% last_same = last_user.id == current_assignee_id %>
+    <%= form_tag issue_path(issue), method: :put, style: 'display:inline' do %>
+      <%= hidden_field_tag 'issue[assigned_to_id]', last_user.id, id: nil %>
+      <button type="submit" class="rqa-btn" <%= 'disabled' if last_same %>>
+        <svg class="rqa-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm5 5a5 5 0 0 0-10 0h10Z"/></svg>
+        <%= l(:button_quick_assign_last) %> (<%= h(last_user.name) %>)
+      </button>
+    <% end %>
+  <% end %>
+
+  <% if prev_user %>
+    <% prev_same = prev_user.id == current_assignee_id %>
+    <%= form_tag issue_path(issue), method: :put, style: 'display:inline' do %>
+      <%= hidden_field_tag 'issue[assigned_to_id]', prev_user.id, id: nil %>
+      <button type="submit" class="rqa-btn" <%= 'disabled' if prev_same %>>
+        <svg class="rqa-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm5 5a5 5 0 0 0-10 0h10Z"/></svg>
+        <%= l(:button_quick_assign_previous) %> (<%= h(prev_user.name) %>)
+      </button>
+    <% end %>
+  <% end %>
+</div>

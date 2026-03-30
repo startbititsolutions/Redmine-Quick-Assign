@@ -1,0 +1,116 @@
+<script>
+(function () {
+  'use strict';
+
+  if (window.redmineQuickAssignBound) return;
+  window.redmineQuickAssignBound = true;
+
+  function dispatchChange(element) {
+    if (typeof Event === 'function') {
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+      return;
+    }
+    var event = document.createEvent('HTMLEvents');
+    event.initEvent('change', true, false);
+    element.dispatchEvent(event);
+  }
+
+  function hasOption(select, value) {
+    if (!select || !select.options) return false;
+    var target = String(value);
+    for (var i = 0; i < select.options.length; i += 1) {
+      if (String(select.options[i].value) === target) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function findAssigneeSelect(button) {
+    var form = button.closest('form');
+    if (form) {
+      var formSelect = form.querySelector('select#issue_assigned_to_id, select[name="issue[assigned_to_id]"]');
+      if (formSelect) return formSelect;
+    }
+
+    var issueFormSelect = document.querySelector('form#issue-form select#issue_assigned_to_id, form#issue-form select[name="issue[assigned_to_id]"]');
+    if (issueFormSelect) return issueFormSelect;
+
+    return document.querySelector('select#issue_assigned_to_id, select[name="issue[assigned_to_id]"]');
+  }
+
+  function clearQuickAssignState(scope) {
+    var root = scope || document;
+    var activeButtons = root.querySelectorAll('.rqa-edit-btn.rqa-btn--active');
+    for (var i = 0; i < activeButtons.length; i += 1) {
+      activeButtons[i].classList.remove('rqa-btn--active');
+    }
+    var feedbacks = root.querySelectorAll('.rqa-edit-bar .rqa-feedback');
+    for (var j = 0; j < feedbacks.length; j += 1) {
+      feedbacks[j].classList.remove('rqa-feedback--visible');
+      feedbacks[j].textContent = '';
+    }
+  }
+
+  document.addEventListener('click', function (event) {
+    var target = event.target;
+    if (!target) return;
+    if (target.nodeType !== 1) {
+      target = target.parentElement;
+    }
+    if (!target || typeof target.closest !== 'function') return;
+
+    var button = target.closest('.rqa-edit-btn');
+    if (!button) return;
+
+    event.preventDefault();
+
+    var select = findAssigneeSelect(button);
+    if (!select) return;
+
+    var userId = button.getAttribute('data-rqa-user-id');
+    if (!hasOption(select, userId)) {
+      var unavailable = button.getAttribute('data-rqa-unavailable') || '';
+      var unavailableBar = button.closest('.rqa-edit-bar');
+      var unavailableFeedback = unavailableBar ? unavailableBar.querySelector('.rqa-feedback') : null;
+      if (unavailableFeedback) {
+        unavailableFeedback.textContent = unavailable;
+        unavailableFeedback.classList.add('rqa-feedback--visible');
+      }
+      return;
+    }
+
+    select.dataset.rqaInternalChange = '1';
+    select.value = String(userId);
+    dispatchChange(select);
+
+    var bar = button.closest('.rqa-edit-bar');
+    clearQuickAssignState(bar || document);
+    button.classList.add('rqa-btn--active');
+
+    var feedback = bar ? bar.querySelector('.rqa-feedback') : null;
+    if (feedback) {
+      var userName = button.getAttribute('data-rqa-user-name') || '';
+      feedback.textContent = '\u2714 ' + userName;
+      feedback.classList.add('rqa-feedback--visible');
+      setTimeout(function () {
+        feedback.classList.remove('rqa-feedback--visible');
+      }, 3000);
+    }
+  });
+
+  document.addEventListener('change', function (event) {
+    var select = event.target;
+    if (!select) return;
+    if (select.tagName !== 'SELECT') return;
+    if (select.id !== 'issue_assigned_to_id' && select.name !== 'issue[assigned_to_id]') return;
+
+    if (select.dataset.rqaInternalChange === '1') {
+      select.dataset.rqaInternalChange = '0';
+      return;
+    }
+
+    clearQuickAssignState(document);
+  });
+})();
+</script>
