@@ -1,0 +1,6 @@
+en:
+  label_quick_assign: Quick assign
+  button_quick_assign_author: Author
+  button_quick_assign_last: Last Commenter
+  button_quick_assign_previous: Prev Assignee
+  notice_quick_assign_unavailable: User not available in assignee list

@@ -1,0 +1,59 @@
+<%
+  issues   = local_assigns[:issues] || []
+  back_url = local_assigns[:back]
+
+  # Only support single-issue selection — multi-select lacks a single author/last/prev
+  return unless issues.size == 1
+
+  issue = issues.first
+  return unless issue.attributes_editable?
+
+  assignable_user_ids = issue.assignable_users.map(&:id)
+
+  author    = issue.author if issue.author && assignable_user_ids.include?(issue.author_id)
+
+  last_user = issue.journals.reorder(id: :desc).detect { |j| j.user.present? }&.user
+  last_user = nil unless last_user && assignable_user_ids.include?(last_user.id)
+
+  prev_detail = JournalDetail.joins(:journal)
+    .where(journals: { journalized_type: 'Issue', journalized_id: issue.id },
+           property: 'attr', prop_key: 'assigned_to_id')
+    .reorder('journals.id DESC').first
+  prev_user = User.find_by(id: prev_detail&.old_value.presence)
+  prev_user = nil unless prev_user && assignable_user_ids.include?(prev_user.id)
+  current_assignee_id = issue.assigned_to_id
+
+  return unless author || last_user || prev_user
+%>
+
+<li class="folder">
+  <a href="#" class="submenu"><%= l(:label_quick_assign) %></a>
+  <ul>
+    <% if author %>
+      <li>
+        <%= context_menu_link "#{l(:button_quick_assign_author)} (#{h(author.name)})",
+              _bulk_update_issues_path(issue, ids: [issue.id], issue: { assigned_to_id: author.id }, back_url: back_url),
+              method: :patch,
+              disabled: (author.id == current_assignee_id) %>
+      </li>
+    <% end %>
+
+    <% if last_user %>
+      <li>
+        <%= context_menu_link "#{l(:button_quick_assign_last)} (#{h(last_user.name)})",
+              _bulk_update_issues_path(issue, ids: [issue.id], issue: { assigned_to_id: last_user.id }, back_url: back_url),
+              method: :patch,
+              disabled: (last_user.id == current_assignee_id) %>
+      </li>
+    <% end %>
+
+    <% if prev_user %>
+      <li>
+        <%= context_menu_link "#{l(:button_quick_assign_previous)} (#{h(prev_user.name)})",
+              _bulk_update_issues_path(issue, ids: [issue.id], issue: { assigned_to_id: prev_user.id }, back_url: back_url),
+              method: :patch,
+              disabled: (prev_user.id == current_assignee_id) %>
+      </li>
+    <% end %>
+  </ul>
+</li>
